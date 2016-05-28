@@ -53,20 +53,28 @@ void handleControlChange(byte channel, byte number, byte value)
       ym.setRateScaling(value);
       break;
    case 51:
-      //operatorSelection(1,value);
+      ym.setOperator(0,value);
       break;
    case 52:
-      //operatorSelection(2,value);
+      ym.setOperator(1,value);
       break;
    case 53:
-      //operatorSelection(3,value);
+      ym.setOperator(2,value);
       break;
    case 54:
-      //operatorSelection(4,value);
+      ym.setOperator(3,value);
       break;
    case 55:
-      //setAlgorithm(value);
+      ym.setAlgorithm(value);
       break;  
+   case 56:
+      ym.setChannel(value);
+      break;  
+   case 57:
+      ym.setUnison(value);
+      break;  
+
+      
   }
   
 }
