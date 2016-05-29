@@ -3,6 +3,7 @@
 
 MIDI_CREATE_DEFAULT_INSTANCE();
 YM2612 ym;
+bool play_seq = true;
 
 void handleNoteOn(byte channel, byte pitch, byte velocity)
 {
@@ -19,11 +20,14 @@ void handleControlChange(byte channel, byte number, byte value)
 {
   switch(number) {
 
+   // mod wheel
    case 1:
       ym.setLFO(value);
       break;
+
+   // encoders
    case 21:
-      //ym.setAttackRate(value);
+      ym.setPlaymode(value);
       break;      
    case 22:
       //ym.setAttackRate(value);
@@ -46,7 +50,8 @@ void handleControlChange(byte channel, byte number, byte value)
    case 28:
       ym.setFMS(value);
       break;      
-     
+
+   // faders
    case 41:
       ym.setAttackRate(value);
       break;      
@@ -74,6 +79,8 @@ void handleControlChange(byte channel, byte number, byte value)
    case 49:
       ym.setRateScaling(value);
       break;
+
+   // toggles
    case 51:
       ym.selectOperator(0,value);
       break;
@@ -95,7 +102,25 @@ void handleControlChange(byte channel, byte number, byte value)
    case 57:
       ym.setUnison(value);
       break;  
-
+   case 58:
+      ym.setAmplitudeModulation(value);
+      break;  
+      
+  // transport
+   case 112:
+      break;
+   case 113:
+      break;
+   case 114:
+      play_seq = false;
+      break;
+   case 115:
+      play_seq = true;
+      break;
+   case 116:
+      break;
+   case 117:
+      break;
       
   }
   
@@ -114,15 +139,22 @@ void setup() {
   
 }
 
-int note = 0;
-uint32_t previousMillis = 0;
-int interval = 700;
-bool pressed = false;
+
 
 void loop() {
   MIDI.read();
   ym.update();
 
+  if(play_seq)
+    playSeq();
+    
+}
+
+void playSeq(){
+  static int note = 0;
+  static uint32_t previousMillis = 0;
+  static int interval = 700;
+  static bool pressed = false;  
   uint32_t currentMillis = millis();
 
   if (currentMillis - previousMillis >= interval) {
@@ -137,6 +169,5 @@ void loop() {
       pressed = true;
     }
 
-  }
-  
+  }  
 }
