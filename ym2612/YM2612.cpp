@@ -3,20 +3,20 @@
 
 
 void YM2612::setup(uint8_t ic_pin,
-               uint8_t cs_pin,
-               uint8_t wr_pin,
-               uint8_t rd_pin,
-               uint8_t a0_pin,
-               uint8_t a1_pin,
-               uint8_t mc_pin,
-               uint8_t data0_pin,
-               uint8_t data1_pin,
-               uint8_t data2_pin,
-               uint8_t data3_pin,
-               uint8_t data4_pin,
-               uint8_t data5_pin,
-               uint8_t data6_pin,
-               uint8_t data7_pin)
+                   uint8_t cs_pin,
+                   uint8_t wr_pin,
+                   uint8_t rd_pin,
+                   uint8_t a0_pin,
+                   uint8_t a1_pin,
+                   uint8_t mc_pin,
+                   uint8_t data0_pin,
+                   uint8_t data1_pin,
+                   uint8_t data2_pin,
+                   uint8_t data3_pin,
+                   uint8_t data4_pin,
+                   uint8_t data5_pin,
+                   uint8_t data6_pin,
+                   uint8_t data7_pin)
 {
   this->ic_pin = ic_pin;
   this->cs_pin = cs_pin;
@@ -60,18 +60,18 @@ void YM2612::initialize() {
   digitalWrite(cs_pin, HIGH);
   digitalWrite(wr_pin, HIGH);
   digitalWrite(rd_pin, HIGH);
-  
+
   /* A0 and A1 LOW by default */
   digitalWrite(a0_pin, LOW);
   digitalWrite(a1_pin, LOW);
-  
+
   /* F_CPU / 2 clock generation */
   TCCR1A = _BV(COM1A0);            /* Toggle OCA1 on compare match */
   TCCR1B = _BV(WGM12) | _BV(CS10); /* CTC mode with prescaler /1 */
   TCCR1C = 0;                      /* Flag reset */
   TCNT1 = 0;                       /* Counter reset */
   OCR1A = 0;                       /* Divide base clock by two */
-  
+
   /* Reset YM2612 */
   digitalWrite(ic_pin, LOW);
   delay(10);
@@ -83,165 +83,50 @@ void YM2612::initialize() {
 
 }
 
-void YM2612::setFrequency(int frequency, int block){
-  setRegPart0(0xA4, ((frequency>>8) & 0B00000111) | (0B00111000 & (block<<3) ) ); // Set frequency
-  setRegPart0(0xA0, frequency);
-
-  setRegPart0(0xA5, ((frequency>>8) & 0B00000111) | (0B00111000 & (block<<3) ) ); // Set frequency
-  setRegPart0(0xA1, frequency);
-
-  setRegPart0(0xA6, ((frequency>>8) & 0B00000111) | (0B00111000 & (block<<3) ) ); // Set frequency
-  setRegPart0(0xA2, frequency);
-
-  setRegPart1(0xA4, ((frequency>>8) & 0B00000111) | (0B00111000 & (block<<3) ) ); // Set frequency
-  setRegPart1(0xA0, frequency);
-
-  setRegPart1(0xA5, ((frequency>>8) & 0B00000111) | (0B00111000 & (block<<3) ) ); // Set frequency
-  setRegPart1(0xA1, frequency);
-
-  setRegPart1(0xA6, ((frequency>>8) & 0B00000111) | (0B00111000 & (block<<3) ) ); // Set frequency
-  setRegPart1(0xA2, frequency);
-  
+void YM2612::setLFO (int value) { 
+  //mod wheel value (0..8) is used both to enable
+  // and to set lfo freq
+  if(value==0){
+    setMasterParameter( YM_MA_LFO_E, 0);    
+  }else{
+    setMasterParameter( YM_MA_LFO_E, 1);
+    setMasterParameter( YM_MA_LFO_F, value-1);
+  }
 }
 
-void YM2612::keyOn(){
-  setRegPart0(0x28, 0xF0); // Key on
-  setRegPart0(0x28, 0xF1); // Key on
-  setRegPart0(0x28, 0xF2); // Key on
-  setRegPart0(0x28, 0xF4); // Key on
-  setRegPart0(0x28, 0xF5); // Key on
-  setRegPart0(0x28, 0xF6); // Key on
-}
 
-void YM2612::keyOff(){
-  setRegPart0(0x28, 0x00); // Key off
-  setRegPart0(0x28, 0x01); // Key off
-  setRegPart0(0x28, 0x02); // Key off
-  setRegPart0(0x28, 0x04); // Key off
-  setRegPart0(0x28, 0x05); // Key off
-  setRegPart0(0x28, 0x06); // Key off
-}
-
-/*
-void create_piano2() {
-
-  unison = true;
-  channel =0;
-  operators[0] = true;
-  operators[1] = true;
-  operators[2] = true;
-  operators[3] = true;
-  
-  setLFO_Enable(0);
-  keyOff();
-  setRegPart0(0x2B, 0x00); // DAC off
-
-  setLFO_Enable(1);
-  setLFO_Frequency(2);      
-  setChan3Mode(0);
-    
-  //channel params
-  setFeedback(1);
-  setAlgorithm(7);
-  setStereo(1,1);
-  setAMS(3);
-  setFMS(2);
-  //operator params
-  setAmplitudeModulation(1);
-  setAttackRate(15);
-  setDecayRate(15);
-  setSustainRate(15);
-  setReleaseRate(5);
-  setTotalLevel(0);
-  setSustainLevel(8);
-  setMultiply(2);
-  setDetune(3);
-  setRateScaling(1);
-  setSSG_EG(0);
-  keyOff();
-}
-*/
 void YM2612::create_piano() {
 
-  unison = false;
-  channel =0;
+  unison = true;
+  selected_channel = 1;
   operators[0] = true;
   operators[1] = true;
   operators[2] = true;
   operators[3] = true;
-  
-  setRegPart0(0x22, 0x00); // LFO off
-  setRegPart0(0x27, 0x00); // Note off (channel 0)
-  setRegPart0(0x28, 0x01); // Note off (channel 1)
-  setRegPart0(0x28, 0x02); // Note off (channel 2)
-  setRegPart0(0x28, 0x04); // Note off (channel 3)
-  setRegPart0(0x28, 0x05); // Note off (channel 4)
-  setRegPart0(0x28, 0x06); // Note off (channel 5)
-  setRegPart0(0x2B, 0x00); // DAC off
-  setRegPart0(0x30, 0x71); //
-  setRegPart0(0x34, 0x0D); //
-  setRegPart0(0x38, 0x33); //
-  setRegPart0(0x3C, 0x01); // DT1/MUL
-  setRegPart0(0x40, 0x23); //
-  setRegPart0(0x44, 0x2D); //
-  setRegPart0(0x48, 0x26); //
-  setRegPart0(0x4C, 0x00); // Total level
-  setRegPart0(0x50, 0x5F); //
-  setRegPart0(0x54, 0x99); //
-  setRegPart0(0x58, 0x5F); //
-  setRegPart0(0x5C, 0x94); // RS/AR 
-  setRegPart0(0x60, 0x05); //
-  setRegPart0(0x64, 0x05); //
-  setRegPart0(0x68, 0x05); //
-  setRegPart0(0x6C, 0x07); // AM/D1R
-  setRegPart0(0x70, 0x02); //
-  setRegPart0(0x74, 0x02); //
-  setRegPart0(0x78, 0x02); //
-  setRegPart0(0x7C, 0x02); // D2R
-  setRegPart0(0x80, 0x11); //
-  setRegPart0(0x84, 0x11); //
-  setRegPart0(0x88, 0x11); //
-  setRegPart0(0x8C, 0xA6); // D1L/RR
-  setRegPart0(0x90, 0x00); //
-  setRegPart0(0x94, 0x00); //
-  setRegPart0(0x98, 0x00); //
-  setRegPart0(0x9C, 0x00); // Proprietary
-  setRegPart0(0xB0, 0x32); // Feedback/algorithm
-  setRegPart0(0xB4, 0xC0); // Both speakers on
 
+  for(int i=0;i<6;i++){
+    voices[i].on = false;
+    keyOff(i);
+  }
 
-  setRegPart1(0x30, 0x71); //
-  setRegPart1(0x34, 0x0D); //
-  setRegPart1(0x38, 0x33); //
-  setRegPart1(0x3C, 0x01); // DT1/MUL
-  setRegPart1(0x40, 0x23); //
-  setRegPart1(0x44, 0x2D); //
-  setRegPart1(0x48, 0x26); //
-  setRegPart1(0x4C, 0x00); // Total level
-  setRegPart1(0x50, 0x5F); //
-  setRegPart1(0x54, 0x99); //
-  setRegPart1(0x58, 0x5F); //
-  setRegPart1(0x5C, 0x94); // RS/AR 
-  setRegPart1(0x60, 0x05); //
-  setRegPart1(0x64, 0x05); //
-  setRegPart1(0x68, 0x05); //
-  setRegPart1(0x6C, 0x07); // AM/D1R
-  setRegPart1(0x70, 0x02); //
-  setRegPart1(0x74, 0x02); //
-  setRegPart1(0x78, 0x02); //
-  setRegPart1(0x7C, 0x02); // D2R
-  setRegPart1(0x80, 0x11); //
-  setRegPart1(0x84, 0x11); //
-  setRegPart1(0x88, 0x11); //
-  setRegPart1(0x8C, 0xA6); // D1L/RR
-  setRegPart1(0x90, 0x00); //
-  setRegPart1(0x94, 0x00); //
-  setRegPart1(0x98, 0x00); //
-  setRegPart1(0x9C, 0x00); // Proprietary
-  setRegPart1(0xB0, 0x32); // Feedback/algorithm
-  setRegPart1(0xB4, 0xC0); // Both speakers on
+  //channel params
+  setFeedback(0);
+  setAlgorithm(7);
+  setStereo(3);
+  setAMS(0);
+  setFMS(7);
+  //operator params
+  setAmplitudeModulation(1);
+  setAttackRate(31);
+  setDecayRate(31);
+  setSustainRate(0);
+  setReleaseRate(8);
+  setTotalLevel(0);
+  setSustainLevel(0);
+  setMultiply(2);
+  setDetune(3);
+  setPlaymode(POLY6x1);
   
-  keyOff();
 }
 
 void YM2612::write_ym(uint8_t data) {
@@ -265,87 +150,184 @@ void YM2612::write_ym(uint8_t data) {
 }
 
 
-void YM2612::setRegPart0(uint8_t reg, uint8_t data) {
-  digitalWrite(a1_pin, LOW);
+void YM2612::setRegister(uint8_t part, uint8_t reg, uint8_t data) {
+  digitalWrite(a1_pin, part);
   digitalWrite(a0_pin, LOW);
   write_ym(reg);
   digitalWrite(a0_pin, HIGH);
   write_ym(data);
 }
 
-void YM2612::setRegPart1(uint8_t reg, uint8_t data) {
-  digitalWrite(a1_pin, HIGH);
-  digitalWrite(a0_pin, LOW);
-  write_ym(reg);
-  digitalWrite(a0_pin, HIGH);
-  write_ym(data);
-}
-
-void YM2612::setRegPart(uint8_t part, uint8_t reg, uint8_t data){
-  if(part==0)
-    setRegPart0(reg, data);
-  else
-    setRegPart1(reg, data);
-}
-
-void YM2612::setMasterParameter(int reg_offset, int val_size, int val_shift,int val){
+void YM2612::setMasterParameter(int reg_offset, int val_size, int val_shift, int val) {
   uint8_t* p = (uint8_t *) ( &master) + reg_offset;
 
-  *(p) &= ~(mask(val_size)<<val_shift); //clean
-  *(p) |= ((mask(val_size) & val)<<val_shift); //write
-  setRegPart(0, YM_MASTER_ADDR + reg_offset, *(p));
-  
+  *(p) &= ~(mask(val_size) << val_shift); //clean
+  *(p) |= ((mask(val_size) & val) << val_shift); //write
+  setRegister(0, YM_MASTER_ADDR + reg_offset, *(p));
+
 }
 
-void YM2612::setChannelParameter(int reg_offset, int val_size, int val_shift,int val){
+void YM2612::setChannelParameter(int reg_offset, int val_size, int val_shift, int val) {
 
-    if(unison){
-      for(int i=0;i<6;i++)
-        setChannelParameter(i, reg_offset, val_size, val_shift, val);   
-    }else{
-      setChannelParameter(channel, reg_offset, val_size, val_shift, val);   
-    }
-  
+  if (unison) {
+    for (int i = 0; i < 6; i++)
+      setChannelParameter(i, reg_offset, val_size, val_shift, val);
+  } else {
+    setChannelParameter(selected_channel, reg_offset, val_size, val_shift, val);
+  }
+
 }
 
-void YM2612::setChannelParameter(int chan, int reg_offset, int val_size, int val_shift,int val){
+void YM2612::setChannelParameter(int chan, int reg_offset, int val_size, int val_shift, int val) {
 
-  int channel_part = chan/3;
+  int channel_part = chan / 3;
   uint8_t* p = (uint8_t *) ( &channels[channel_part]) + reg_offset;
-  int channel_offset = chan%3; //which of the 12 registers
+  int channel_offset = chan % 3; //which of the 12 registers
 
-  *(p+channel_offset) &= ~(mask(val_size)<<val_shift); //clean
-  *(p+channel_offset) |= ((mask(val_size) & val)<<val_shift); //write
-  setRegPart(channel_part, YM_CHN_ADDR + reg_offset + channel_offset, *(p+channel_offset));
-  
+  *(p + channel_offset) &= ~(mask(val_size) << val_shift); //clean
+  *(p + channel_offset) |= ((mask(val_size) & val) << val_shift); //write
+  setRegister(channel_part, YM_CHN_ADDR + reg_offset + channel_offset, *(p + channel_offset));
+
 }
 
 
-void YM2612::setOperatorParameter(int reg_offset, int val_size, int val_shift,int val){
+void YM2612::setOperatorParameter(int reg_offset, int val_size, int val_shift, int val) {
 
-    if(unison){
-      for(int i=0;i<6;i++)
-        setOperatorParameter(i, reg_offset, val_size, val_shift, val);   
-    }else{
-      setOperatorParameter(channel, reg_offset, val_size, val_shift, val);   
-    }
-  
+  if (unison) {
+    for (int i = 0; i < 6; i++)
+      setOperatorParameter(i, reg_offset, val_size, val_shift, val);
+  } else {
+    setOperatorParameter(selected_channel, reg_offset, val_size, val_shift, val);
+  }
+
 }
 
 
-void YM2612::setOperatorParameter(int chan, int reg_offset, int val_size, int val_shift,int val){
+void YM2612::setOperatorParameter(int chan, int reg_offset, int val_size, int val_shift, int val) {
+  for (int i = 0; i < 4; i++)
+    if (operators[i])
+      setOperatorParameter(chan, i, reg_offset, val_size, val_shift, val);
+}
 
-  int channel_part = chan/3;
+void YM2612::setOperatorParameter(int chan,int oper, int reg_offset, int val_size, int val_shift, int val) {
+  int channel_part = chan / 3;
   uint8_t* p = (uint8_t *) ( &channels[channel_part]) + reg_offset;
+  int op_offset = chan % 3 + oper * 4; //which of the 12 registers
+  *(p + op_offset) &= ~(mask(val_size) << val_shift); //clean
+  *(p + op_offset) |= ((mask(val_size) & val) << val_shift); //write
+  setRegister(channel_part, YM_CHN_ADDR + reg_offset + op_offset, *(p + op_offset));
+}
+
+
+float note2freq[128] = {
+    8.18f,     8.66f,     9.18f,     9.72f,    10.30f,    10.91f,    11.56f,    12.25f,    12.98f,    13.75f,    14.57f,    15.43f, 
+   16.35f,    17.32f,    18.35f,    19.45f,    20.60f,    21.83f,    23.12f,    24.50f,    25.96f,    27.50f,    29.14f,    30.87f, 
+   32.70f,    34.65f,    36.71f,    38.89f,    41.20f,    43.65f,    46.25f,    49.00f,    51.91f,    55.00f,    58.27f,    61.74f, 
+   65.41f,    69.30f,    73.42f,    77.78f,    82.41f,    87.31f,    92.50f,    98.00f,   103.83f,   110.00f,   116.54f,   123.47f, 
+  130.81f,   138.59f,   146.83f,   155.56f,   164.81f,   174.61f,   185.00f,   196.00f,   207.65f,   220.00f,   233.08f,   246.94f, 
+  261.63f,   277.18f,   293.66f,   311.13f,   329.63f,   349.23f,   369.99f,   392.00f,   415.30f,   440.00f,   466.16f,   493.88f, 
+  523.25f,   554.37f,   587.33f,   622.25f,   659.26f,   698.46f,   739.99f,   783.99f,   830.61f,   880.00f,   932.33f,   987.77f, 
+ 1046.50f,  1108.73f,  1174.66f,  1244.51f,  1318.51f,  1396.91f,  1479.98f,  1567.98f,  1661.22f,  1760.00f,  1864.66f,  1975.53f, 
+ 2093.00f,  2217.46f,  2349.32f,  2489.02f,  2637.02f,  2793.83f,  2959.96f,  3135.96f,  3322.44f,  3520.00f,  3729.31f,  3951.07f, 
+ 4186.01f,  4434.92f,  4698.64f,  4978.03f,  5274.04f,  5587.65f,  5919.91f,  6271.93f,  6644.88f,  7040.00f,  7458.62f,  7902.13f, 
+ 8372.02f,  8869.84f,  9397.27f,  9956.06f, 10548.08f, 11175.30f, 11839.82f, 12543.85f
+};
+
+
+void YM2612::noteOn(byte channel, byte pitch, byte velocity)
+{
+  static int indexx = 0;
+
+  int index = -1;
   
-  for(int i=0;i<4;i++){ 
-    int op_offset = chan%3 + i*4; //which of the 12 registers
-    if(operators[i]){
-      *(p+op_offset) &= ~(mask(val_size)<<val_shift); //clean
-      *(p+op_offset) |= ((mask(val_size) & val)<<val_shift); //write
-      setRegPart(channel_part, YM_CHN_ADDR + reg_offset + op_offset, *(p+op_offset));      
+
+  //attempts to find a free voice
+  for(int i=0;i<6;i++){
+    if(!voices[i].on){
+      index = i;
+      voices_order[voices_order_index] = i;
+      break;
     }
   }
   
+  
+  // no free voice, just kill the oldest
+  if(index==-1)
+    index = voices_order[voices_order_index];
+
+  voices_order_index++;
+  voices_order_index %=6;
+  
+  voices[index].on = true;
+  voices[index].note = pitch;
+  voices[index].frequency = note2freq[pitch];
+  setFrequency(index,voices[index].frequency);
+  keyOn(index);
+
+  
+  /*
+  //todo: only change slot operator levels
+  uint8_t tl[16];
+  uint8_t d1l_rr[16];
+  float att = (float)(127 - velocity)/5.0f;
+  //save total level
+  memcpy(&tl, &(channels[0].TL), sizeof tl);
+  memcpy(&d1l_rr, &(channels[0].D1L_RR), sizeof d1l_rr);
+
+  for (int i = 0; i < 4; i++)
+    if (operators[i]){
+      setOperatorParameter(0, i, YM_OP_TL, tl[i*4] + att );
+      //setOperatorParameter(0, i, YM_OP_D1L, (d1l_rr[i*4]/16) + att/8 );
+    }
+
+  //restore total level
+  memcpy(&(channels[0].TL), &tl, sizeof tl);
+  memcpy(&(channels[0].D1L_RR), &d1l_rr, sizeof d1l_rr);
+  keyOn();
+  */
+
+}
+
+void YM2612::noteOff(byte channel, byte pitch, byte velocity)
+{
+
+  for(int i = 0; i<6;i++){
+    if(voices[i].on && voices[i].note == pitch){
+      voices[i].on = false;
+      keyOff(i);
+    }
+  }
+
+
+
+}
+
+
+void YM2612::setFrequency(uint8_t chan, float frequency) {
+  int block = 2;
+  uint16_t freq;
+  while (frequency >= 2048) {
+    frequency /= 2;
+    block++;
+  }
+  freq = (uint16_t)frequency;
+
+  //setMasterParameter( YM_MA_OP_CHAN, 0xF0 + ((channel/3) * 4 + channel%3 ) );
+
+  setRegister(chan/3, 0xA4+(chan%3), ((freq >> 8) & mask(3)) | ( ( block & mask(3) ) << 3)  ); // Set frequency
+  setRegister(chan/3, 0xA0+(chan%3), freq);
+
+}
+
+
+void YM2612::keyOn(uint8_t chan) {
+  setMasterParameter( YM_MA_OP_CHAN, 0xF0 + ((chan/3) * 4 + chan%3 ) );
+}
+
+void YM2612::keyOff(uint8_t chan) {
+  setMasterParameter( YM_MA_OP_CHAN, 0x00 +((chan/3) * 4 + chan%3 ) );
+}
+    
+void YM2612::update(){
 }
 

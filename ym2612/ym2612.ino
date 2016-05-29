@@ -4,20 +4,14 @@
 MIDI_CREATE_DEFAULT_INSTANCE();
 YM2612 ym;
 
-int notes[] = {617,   653,   692,   733,   777,   823,   872,   924,   979,  1037,  1099,  1164};
-int notes_down = 0;
 void handleNoteOn(byte channel, byte pitch, byte velocity)
 {
-  notes_down++;
-  ym.setFrequency(notes[pitch%12], pitch/12);
-  ym.keyOn();
+  ym.noteOn(channel, pitch, velocity);
 }
 
 void handleNoteOff(byte channel, byte pitch, byte velocity)
 {
-  notes_down--;
-  if(notes_down==0)
-    ym.keyOff();
+  ym.noteOff(channel, pitch, velocity);
 }
 
 
@@ -25,9 +19,37 @@ void handleControlChange(byte channel, byte number, byte value)
 {
   switch(number) {
 
+   case 1:
+      ym.setLFO(value);
+      break;
+   case 21:
+      //ym.setAttackRate(value);
+      break;      
+   case 22:
+      //ym.setAttackRate(value);
+      break;      
+   case 23:
+      //ym.setAttackRate(value);
+      break;      
+   case 24:
+      //ym.setAttackRate(value);
+      break;      
+   case 25:
+      //ym.setAttackRate(value);
+      break;      
+   case 26:
+      ym.setStereo(value);
+      break;      
+   case 27:
+      ym.setAMS(value);
+      break;      
+   case 28:
+      ym.setFMS(value);
+      break;      
+     
    case 41:
       ym.setAttackRate(value);
-      break;
+      break;      
    case 42:
       ym.setDecayRate(value);
       break;
@@ -53,22 +75,22 @@ void handleControlChange(byte channel, byte number, byte value)
       ym.setRateScaling(value);
       break;
    case 51:
-      ym.setOperator(0,value);
+      ym.selectOperator(0,value);
       break;
    case 52:
-      ym.setOperator(1,value);
+      ym.selectOperator(1,value);
       break;
    case 53:
-      ym.setOperator(2,value);
+      ym.selectOperator(2,value);
       break;
    case 54:
-      ym.setOperator(3,value);
+      ym.selectOperator(3,value);
       break;
    case 55:
       ym.setAlgorithm(value);
       break;  
    case 56:
-      ym.setChannel(value);
+      ym.selectChannel(value);
       break;  
    case 57:
       ym.setUnison(value);
@@ -92,6 +114,29 @@ void setup() {
   
 }
 
+int note = 0;
+uint32_t previousMillis = 0;
+int interval = 700;
+bool pressed = false;
+
 void loop() {
   MIDI.read();
+  ym.update();
+
+  uint32_t currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    if(pressed){
+      ym.noteOff(1, 60+note, 0);
+      note++;
+      note %=12;
+      pressed = false;
+    }else{
+      ym.noteOn(1, 60+note, 100);
+      pressed = true;
+    }
+
+  }
+  
 }
