@@ -16,8 +16,17 @@ void handleNoteOff(byte channel, byte pitch, byte velocity)
 }
 
 
+void handlePitchBend(byte channel, int bend)
+{
+  ym.pitchBend(channel, bend);
+}
+
+
 void handleControlChange(byte channel, byte number, byte value)
 {
+
+  UNUSED(channel);
+  
   switch(number) {
 
    // mod wheel
@@ -135,6 +144,9 @@ void setup() {
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
   MIDI.setHandleControlChange(handleControlChange);
+  MIDI.setHandlePitchBend(handlePitchBend);
+
+  
   MIDI.begin(MIDI_CHANNEL_OMNI);
   
 }
@@ -151,9 +163,9 @@ void loop() {
 }
 
 void playSeq(){
-  static int note = 0;
+  static uint8_t note = 0;
   static uint32_t previousMillis = 0;
-  static int interval = 700;
+  static uint32_t interval = 700;
   static bool pressed = false;  
   uint32_t currentMillis = millis();
 

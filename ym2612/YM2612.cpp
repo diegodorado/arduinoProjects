@@ -79,23 +79,14 @@ void YM2612::initialize() {
   delay(10);
 
 
-  create_piano();
+  setDefaults();
 
 }
 
-void YM2612::setLFO (int value) { 
-  //mod wheel value (0..8) is used both to enable
-  // and to set lfo freq
-  if(value==0){
-    setMasterParameter( YM_MA_LFO_E, 0);    
-  }else{
-    setMasterParameter( YM_MA_LFO_E, 1);
-    setMasterParameter( YM_MA_LFO_F, value-1);
-  }
-}
 
 
-void YM2612::create_piano() {
+
+void YM2612::setDefaults() {
 
   unison = true;
   selected_channel = 1;
@@ -129,7 +120,18 @@ void YM2612::create_piano() {
   
 }
 
-void YM2612::write_ym(uint8_t data) {
+void YM2612::setLFO (int value) { 
+  //mod wheel value (0..8) is used both to enable
+  // and to set lfo freq
+  if(value==0){
+    setMasterParameter( YM_MA_LFO_E, 0);    
+  }else{
+    setMasterParameter( YM_MA_LFO_E, 1);
+    setMasterParameter( YM_MA_LFO_F, value-1);
+  }
+}
+
+void YM2612::sendData(uint8_t data) {
   digitalWrite(cs_pin, LOW);
 
   digitalWrite(data0_pin, ( (data >> 0) & 0x01) );
@@ -153,9 +155,9 @@ void YM2612::write_ym(uint8_t data) {
 void YM2612::setRegister(uint8_t part, uint8_t reg, uint8_t data) {
   digitalWrite(a1_pin, part);
   digitalWrite(a0_pin, LOW);
-  write_ym(reg);
+  sendData(reg);
   digitalWrite(a0_pin, HIGH);
-  write_ym(data);
+  sendData(data);
 }
 
 void YM2612::setMasterParameter(int reg_offset, int val_size, int val_shift, int val) {
@@ -229,25 +231,28 @@ void YM2612::setPlaymode(int value) {
     voices[i].on = false;
     keyOff(i);
   }
+  notes_stack0.clear();
+  notes_stack1.clear();
   
 }
 
 void YM2612::noteOn(byte channel, byte pitch, byte velocity)
 {
+  UNUSED(channel);
+  UNUSED(velocity);
 
 
   switch(playmode) {
 
     case MONO1x6:
     {
-      notes_stack.add(pitch);
+      notes_stack0.add(pitch);
       for(int i=0;i<6;i++){
-        //todo: do not trigger keyon if a note is hold        
         voices[i].on = true;
         voices[i].note = pitch;
-        voices[i].frequency = note2freq[pitch];
-        setFrequency(i,voices[i].frequency);
-        keyOn(i);  
+        setNote(i,pitch);
+        if(notes_stack0.size()==1) //trigger on first note only
+          keyOn(i);
       }
 
       break;
@@ -273,18 +278,68 @@ void YM2612::noteOn(byte channel, byte pitch, byte velocity)
       
       voices[index].on = true;
       voices[index].note = pitch;
-      voices[index].frequency = note2freq[pitch];
-      setFrequency(index,voices[index].frequency);
+      setNote(index,pitch);
       keyOn(index);   
       break;
     }
       
     case POLY3x2:
-      break;
+    {
+      int index = -1;
+      int concurrent_voices = 2;
       
+      //attempts to find a free voice
+      for(int i=0;i<6;i+=concurrent_voices)
+        if(!voices[i].on){
+          index = i;
+          voices_order[voices_order_index] = i;
+          break;
+        }
+
+      // no free voice, just kill the oldest
+      if(index==-1)
+        index = voices_order[voices_order_index];
+      
+      voices_order_index+=concurrent_voices;
+      voices_order_index %=6;
+
+      for(int i=0;i<concurrent_voices;i++){
+        voices[index+i].on = true;
+        voices[index+i].note = pitch;
+        setNote(index+i,pitch);
+        keyOn(index+i);   
+      }      
+      break;
+    }
     case POLY2x3:
-      break;
+    {
+      int index = -1;
+      int concurrent_voices = 3;
       
+      //attempts to find a free voice
+      for(int i=0;i<6;i+=concurrent_voices)
+        if(!voices[i].on){
+          index = i;
+          voices_order[voices_order_index] = i;
+          break;
+        }
+
+      // no free voice, just kill the oldest
+      if(index==-1)
+        index = voices_order[voices_order_index];
+      
+      voices_order_index+=concurrent_voices;
+      voices_order_index %=6;
+
+      for(int i=0;i<concurrent_voices;i++){
+        voices[index+i].on = true;
+        voices[index+i].note = pitch;
+        setNote(index+i,pitch);
+        keyOn(index+i);   
+      }      
+      break;
+      break;
+    }
     case SPLIT_MONO1x3_MONO1x3:
       break;
       
@@ -303,6 +358,7 @@ void YM2612::noteOn(byte channel, byte pitch, byte velocity)
   
   /*
   //todo: only change slot operator levels
+  //todo: instead for memcopy, hold tl and d1l in dedicated class vars
   uint8_t tl[16];
   uint8_t d1l_rr[16];
   float att = (float)(127 - velocity)/5.0f;
@@ -328,34 +384,36 @@ void YM2612::noteOn(byte channel, byte pitch, byte velocity)
 
 void YM2612::noteOff(byte channel, byte pitch, byte velocity)
 {
+  UNUSED(channel);
+  UNUSED(velocity);
+  
   switch(playmode) {
   
     case MONO1x6:
-      if(notes_stack.size()>0){
-        if( pitch == notes_stack.get(notes_stack.size()-1)){
-          notes_stack.pop();
-          if(notes_stack.size()>0){
-            uint8_t previous = notes_stack.get(notes_stack.size()-1);
+      if(notes_stack0.size()>0){
+        if( pitch == notes_stack0.get(notes_stack0.size()-1)){
+          notes_stack0.pop();
+          if(notes_stack0.size()>0){
+            uint8_t previous = notes_stack0.get(notes_stack0.size()-1);
             for(int i=0;i<6;i++){
               voices[i].note = previous;
-              voices[i].frequency = note2freq[previous];
-              setFrequency(i,voices[i].frequency);
+              setNote(i,previous);
               // dont trigger key on
             }           
           }           
         }else{
           // do nothing
           // only remove note from the stack
-          for(int n = 0;n<notes_stack.size();n++)
-            if( pitch == notes_stack.get(n)){
-              notes_stack.remove(n);
+          for(int n = 0;n<notes_stack0.size();n++)
+            if( pitch == notes_stack0.get(n)){
+              notes_stack0.remove(n);
               break;
             }        
         }
       }
 
       // stack empty? trigger keyoff          
-      if(notes_stack.size()==0){
+      if(notes_stack0.size()==0){
         for(int i = 0; i<6;i++){
           voices[i].on = false;
           keyOff(i);
@@ -375,9 +433,19 @@ void YM2612::noteOff(byte channel, byte pitch, byte velocity)
       break;
       
     case POLY3x2:
+      for(int i = 0; i<6;i++)
+        if(voices[i].on && voices[i].note == pitch){
+          voices[i].on = false;
+          keyOff(i);
+        }       
       break;
       
     case POLY2x3:
+      for(int i = 0; i<6;i++)
+        if(voices[i].on && voices[i].note == pitch){
+          voices[i].on = false;
+          keyOff(i);
+        }       
       break;
       
     case SPLIT_MONO1x3_MONO1x3:
@@ -400,6 +468,58 @@ void YM2612::noteOff(byte channel, byte pitch, byte velocity)
 
 }
 
+void YM2612::pitchBend(byte channel, int bend){
+  UNUSED(channel);  
+  
+  pitchBendValue = bend;
+  for(int i = 0; i<6;i++)
+  
+    if(voices[i].on){
+      float freqFrom = noteToFrequency(voices[i].note-2);;
+      float freqTo = noteToFrequency(voices[i].note+2);
+      setFrequency(i,map(bend,-8192,8191,freqFrom,freqTo));
+    }  
+
+
+  
+}
+
+float YM2612::noteToFrequency(uint8_t note){
+    static float freq[] = {
+      261.63f,   277.18f,   293.66f,   311.13f,   329.63f,   349.23f,   369.99f,   392.00f,   415.30f,   440.00f,   466.16f,   493.88f, 
+    }; 
+    static float multiplier[] = {
+      0.03125f,   0.0625f,   0.125f,   0.25f,   0.5f,   1.0f,   2.0f,   4.0f,   8.0f,   16.0f,   32.0f, 
+    }; 
+  
+  /*
+    static float note2freq[] = {
+        8.18f,     8.66f,     9.18f,     9.72f,    10.30f,    10.91f,    11.56f,    12.25f,    12.98f,    13.75f,    14.57f,    15.43f, 
+       16.35f,    17.32f,    18.35f,    19.45f,    20.60f,    21.83f,    23.12f,    24.50f,    25.96f,    27.50f,    29.14f,    30.87f, 
+       32.70f,    34.65f,    36.71f,    38.89f,    41.20f,    43.65f,    46.25f,    49.00f,    51.91f,    55.00f,    58.27f,    61.74f, 
+       65.41f,    69.30f,    73.42f,    77.78f,    82.41f,    87.31f,    92.50f,    98.00f,   103.83f,   110.00f,   116.54f,   123.47f, 
+      130.81f,   138.59f,   146.83f,   155.56f,   164.81f,   174.61f,   185.00f,   196.00f,   207.65f,   220.00f,   233.08f,   246.94f, 
+      261.63f,   277.18f,   293.66f,   311.13f,   329.63f,   349.23f,   369.99f,   392.00f,   415.30f,   440.00f,   466.16f,   493.88f, 
+      523.25f,   554.37f,   587.33f,   622.25f,   659.26f,   698.46f,   739.99f,   783.99f,   830.61f,   880.00f,   932.33f,   987.77f, 
+     1046.50f,  1108.73f,  1174.66f,  1244.51f,  1318.51f,  1396.91f,  1479.98f,  1567.98f,  1661.22f,  1760.00f,  1864.66f,  1975.53f, 
+     2093.00f,  2217.46f,  2349.32f,  2489.02f,  2637.02f,  2793.83f,  2959.96f,  3135.96f,  3322.44f,  3520.00f,  3729.31f,  3951.07f, 
+     4186.01f,  4434.92f,  4698.64f,  4978.03f,  5274.04f,  5587.65f,  5919.91f,  6271.93f,  6644.88f,  7040.00f,  7458.62f,  7902.13f, 
+     8372.02f,  8869.84f,  9397.27f,  9956.06f, 10548.08f, 11175.30f, 11839.82f, 12543.85f
+    }; 
+    */
+  return freq[note%12]*multiplier[note/12];
+}
+
+void YM2612::setNote(uint8_t channel, uint8_t note){
+    if(pitchBendValue==0){
+      setFrequency(channel,noteToFrequency(note));
+    }
+    else{
+      float freqFrom = noteToFrequency(note-2);;
+      float freqTo = noteToFrequency(note+2);
+      setFrequency(channel,map(pitchBendValue,-8192,8191,freqFrom,freqTo));
+    }    
+}
 
 void YM2612::setFrequency(uint8_t chan, float frequency) {
   int block = 2;
@@ -416,6 +536,7 @@ void YM2612::setFrequency(uint8_t chan, float frequency) {
   setRegister(chan/3, 0xA0+(chan%3), freq);
 
 }
+
 
 
 void YM2612::keyOn(uint8_t chan) {
