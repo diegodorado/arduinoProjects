@@ -158,28 +158,36 @@ void setup() {
          digitalWrite(PULSE_PIN, 0);
 
   audioOn(); 
-  MIDI.setHandleNoteOn(handleNoteOn);
-  MIDI.setHandleNoteOff(handleNoteOff);
-  MIDI.begin(MIDI_CHANNEL_OMNI);
   
 } 
 
-//long testAt;
+int index = 0;
+long lastMillis = 0;
 
+int notas[] = {36,36,41,43,46,48,51};
+
+  
 void loop() { 
-  MIDI.read();
+
+  long curMillis = millis();
+  if((curMillis-lastMillis)>500){
+    if(syncPhaseInc >0){
+      syncPhaseInc =0;
+    }else{
+      syncPhaseInc = midiTable[notas[index]]; 
+      index++;
+      index %=7;
+
+    }
+    lastMillis = curMillis;
+  }
+
+  
   grainPhaseInc  = mapPhaseInc(analogRead(GRAIN_FREQ_CONTROL)) / 2; 
   grainDecay     = analogRead(GRAIN_DECAY_CONTROL) / 8; 
   grain2PhaseInc = mapPhaseInc(analogRead(GRAIN2_FREQ_CONTROL)) / 2; 
   grain2Decay    = analogRead(GRAIN2_DECAY_CONTROL) / 4; 
 
-  if(drumTriggered){
-    long currentMillis = millis();
-    if(currentMillis - drumTriggeredAt > pulseDuration){
-      digitalWrite(PULSE_PIN, 0);
-      drumTriggered = false;
-    }
-  }
 
   
 } 
